@@ -2,13 +2,16 @@
 // Licensed under the MIT license.
 
 import * as _ from "lodash";
-import { Disposable } from "vscode";
+import { Disposable, WorkspaceConfiguration, workspace } from "vscode";
 import * as list from "../commands/list";
 import { getSortingStrategy } from "../commands/plugin";
 import { Category, defaultProblem, ProblemState, SortingStrategy } from "../shared";
 import { shouldHideSolvedProblem } from "../utils/settingUtils";
 import { LeetCodeNode } from "./LeetCodeNode";
-
+interface CustomListConfig {
+    name: string,
+    problems: string[]
+}
 class ExplorerNodeManager implements Disposable {
     private explorerNodeMap: Map<string, LeetCodeNode> = new Map<string, LeetCodeNode>();
     private companySet: Set<string> = new Set<string>();
@@ -53,6 +56,10 @@ class ExplorerNodeManager implements Disposable {
                 id: Category.Favorite,
                 name: Category.Favorite,
             }), false),
+            new LeetCodeNode(Object.assign({}, defaultProblem, {
+                id: Category.Custom,
+                name: Category.Custom,
+            }), false),
         ];
     }
 
@@ -93,6 +100,19 @@ class ExplorerNodeManager implements Disposable {
         this.sortSubCategoryNodes(res, Category.Company);
         return res;
     }
+    public getAllCustomNodes(): LeetCodeNode[] {
+        const leetCodeConfig: WorkspaceConfiguration = workspace.getConfiguration("leetcode");
+        const customlist: CustomListConfig[] = leetCodeConfig.get<CustomListConfig[]>("customlist") ?? [];
+        const res: LeetCodeNode[] = [];
+        for (const customConfig of customlist) {
+            res.push(new LeetCodeNode(Object.assign({}, defaultProblem, {
+                id: `${Category.Custom}.${customConfig.name}`,
+                name: `${customConfig.name}`,
+            }), false));
+        }
+        this.sortSubCategoryNodes(res, Category.Custom);
+        return res;
+    }
 
     public getAllTagNodes(): LeetCodeNode[] {
         const res: LeetCodeNode[] = [];
@@ -124,6 +144,9 @@ class ExplorerNodeManager implements Disposable {
         // The sub-category node's id is named as {Category.SubName}
         const metaInfo: string[] = id.split(".");
         const res: LeetCodeNode[] = [];
+        const leetCodeConfig: WorkspaceConfiguration = workspace.getConfiguration("leetcode");
+        const customlist: CustomListConfig[] = leetCodeConfig.get<CustomListConfig[]>("customlist") ?? [];
+        const customProblems = customlist.find((item) => item.name == metaInfo[1])?.problems ?? []
         for (const node of this.explorerNodeMap.values()) {
             switch (metaInfo[0]) {
                 case Category.Company:
@@ -138,6 +161,11 @@ class ExplorerNodeManager implements Disposable {
                     break;
                 case Category.Tag:
                     if (node.tags.indexOf(metaInfo[1]) >= 0) {
+                        res.push(node);
+                    }
+                    break;
+                case Category.Custom:
+                    if (customProblems.indexOf(_.kebabCase(node.name)) >= 0) {
                         res.push(node);
                     }
                     break;

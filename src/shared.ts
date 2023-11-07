@@ -100,6 +100,7 @@ export enum Category {
     Tag = "Tag",
     Company = "Company",
     Favorite = "Favorite",
+    Custom = "Custom",
 }
 
 export const supportedPlugins: string[] = [
